@@ -2,11 +2,18 @@
 
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
-import { weeklyLeaderboard as mockWeekly, monthlyLeaderboard as mockMonthly, type Photo } from "@/lib/mock-data";
+
+type LeaderboardPhoto = {
+  id: string;
+  url: string;
+  userName: string;
+  views: number;
+  likes: number;
+};
 
 export default function LeaderboardPage() {
   const [tab, setTab] = useState<"weekly" | "monthly">("weekly");
-  const [data, setData] = useState<Photo[]>([]);
+  const [data, setData] = useState<LeaderboardPhoto[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -14,20 +21,13 @@ export default function LeaderboardPage() {
       setLoading(true);
       try {
         const res = await fetch(`/api/leaderboard?period=${tab}`);
-        if (res.ok) {
-          const json = await res.json();
-          if (json.leaderboard && json.leaderboard.length > 0) {
-            setData(json.leaderboard);
-            setLoading(false);
-            return;
-          }
-        }
+        const json = await res.json();
+        setData(json.leaderboard || []);
       } catch {
-        // fallback
+        setData([]);
+      } finally {
+        setLoading(false);
       }
-      // Fallback to mock data
-      setData(tab === "weekly" ? mockWeekly : mockMonthly);
-      setLoading(false);
     }
     load();
   }, [tab]);
@@ -69,6 +69,12 @@ export default function LeaderboardPage() {
 
         {loading ? (
           <div className="text-center py-12 text-gray-500">Loading leaderboard...</div>
+        ) : data.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            No photo views yet this {tab === "weekly" ? "week" : "month"}.
+            <br />
+            Be the first to climb the leaderboard!
+          </div>
         ) : (
           <div className="space-y-4">
             {data.map((photo, index) => {

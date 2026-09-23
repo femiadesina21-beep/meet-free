@@ -77,6 +77,13 @@ export type DbChat = {
   updatedAt: string;
 };
 
+export type DbLike = {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  createdAt: string;
+};
+
 // ============ Users ============
 
 export async function getUsers(): Promise<DbUser[]> {
@@ -213,4 +220,61 @@ export async function createChat(participantIds: string[]): Promise<DbChat> {
   chats.push(newChat);
   await writeJson("chats.json", chats);
   return newChat;
+}
+
+// ============ Likes / Matches ============
+
+export async function getLikes(): Promise<DbLike[]> {
+  return readJson<DbLike[]>("likes.json", []);
+}
+
+export async function addLike(fromUserId: string, toUserId: string): Promise<DbLike> {
+  const likes = await getLikes();
+  const existing = likes.find((l) => l.fromUserId === fromUserId && l.toUserId === toUserId);
+  if (existing) return existing;
+  const newLike: DbLike = {
+    id: `l_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    fromUserId,
+    toUserId,
+    createdAt: new Date().toISOString(),
+  };
+  likes.push(newLike);
+  await writeJson("likes.json", likes);
+  return newLike;
+}
+
+export async function hasMutualLike(userA: string, userB: string): Promise<boolean> {
+  const likes = await getLikes();
+  const aLikedB = likes.some((l) => l.fromUserId === userA && l.toUserId === userB);
+  const bLikedA = likes.some((l) => l.fromUserId === userB && l.toUserId === userA);
+  return aLikedB && bLikedA;
+}
+
+export async function getLikedUserIds(userId: string): Promise<string[]> {
+  const likes = await getLikes();
+  return likes.filter((l) => l.fromUserId === userId).map((l) => l.toUserId);
+}
+
+export async function findExistingChat(userA: string, userB: string): Promise<DbChat | null> {
+  const chats = await getChats();
+  return (
+    chats.find(
+      (c) =>
+        c.participants.length === 2 &&
+        c.participants.includes(userA) &&
+        c.participants.includes(userB)
+    ) || null
+  );
+}
+
+export async function updateUser(
+  id: string,
+  updates: Partial<Omit<DbUser, "id" | "email" | "password" | "createdAt">>
+): Promise<DbUser | null> {
+  const users = await getUsers();
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) return null;
+  users[idx] = { ...users[idx], ...updates };
+  await writeJson("users.json", users);
+  return users[idx];
 }
